@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>502 Lima Data Collection</title>
+<meta name="theme-color" content="#18212b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="502 Lima">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: fleet log sheet. Unit header strip, category totals, entry form, then the running log table. */
+:root{
+  --bg:#eef1f4; --panel:#ffffff; --ink:#18212b; --muted:#5b6876; --line:#d3dae1;
+  --accent:#e08a00; --accent-ink:#1b1300; --accent-soft:#fff2d9;
+  --repair:#c2402f; --repair-soft:#fbe7e4;
+  --travel:#2f6fb3; --travel-soft:#e3eefa;
+  --oncall:#1f8a6d; --oncall-soft:#e0f3ed;
+  --change:#7a4fb0; --change-soft:#efe7f8;
+  --r-black:#141414; --r-green:#1d7a35; --r-red:#c3262e; --r-blue:#1e5ec4; --r-ink:#ffffff; --r-edge:transparent;
+  --danger:#b3261e;
+  --display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12171d; --panel:#1a2129; --ink:#e6ebf0; --muted:#9aa7b4; --line:#2c3640;
+  --accent:#f3a32b; --accent-ink:#1b1300; --accent-soft:#3a2b10;
+  --repair:#ef7a6a; --repair-soft:#3a1f1b;
+  --travel:#7cb2ec; --travel-soft:#17293d;
+  --oncall:#5fcba9; --oncall-soft:#143229;
+  --change:#b99ae6; --change-soft:#2a2038;
+  --r-black:#050505; --r-green:#22893c; --r-red:#d0343c; --r-blue:#2b6fd6; --r-ink:#ffffff; --r-edge:#7d8994;
+  --danger:#ff8a80; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12171d; --panel:#1a2129; --ink:#e6ebf0; --muted:#9aa7b4; --line:#2c3640;
+  --accent:#f3a32b; --accent-ink:#1b1300; --accent-soft:#3a2b10;
+  --repair:#ef7a6a; --repair-soft:#3a1f1b;
+  --travel:#7cb2ec; --travel-soft:#17293d;
+  --oncall:#5fcba9; --oncall-soft:#143229;
+  --change:#b99ae6; --change-soft:#2a2038;
+  --r-black:#050505; --r-green:#22893c; --r-red:#d0343c; --r-blue:#2b6fd6; --r-ink:#ffffff; --r-edge:#7d8994;
+  --danger:#ff8a80; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+.wrap{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1,h2{font-family:var(--display);font-weight:700;letter-spacing:.01em;margin:0;text-wrap:balance}
+h2{font-size:1.35rem;text-transform:uppercase;letter-spacing:.05em}
+.label{font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:600}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* Header strip */
+.unit{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;border-bottom:3px solid var(--accent);padding-bottom:14px}
+.unit h1{font-size:2.4rem;line-height:1}
+.plate{display:inline-block;font-family:var(--mono);font-weight:600;background:var(--accent);color:var(--accent-ink);padding:2px 10px;border-radius:3px;font-size:1rem;margin-right:10px;vertical-align:middle}
+.unit p{margin:6px 0 0;color:var(--muted)}
+.status{font-size:.85rem;color:var(--muted)}
+
+/* Period + totals */
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--panel)}
+.seg button{border:0;background:transparent;color:var(--ink);font:inherit;font-size:.88rem;padding:7px 12px;cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.totals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.tile.all{grid-column:1/-1;--c:var(--accent)}
+.tile.all .big{font-size:2.2rem}
+.split{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--line);margin-top:6px}
+.split span{height:100%;width:0}
+.split .travel{background:var(--travel)}.split .oncall{background:var(--oncall)}.split .change{background:var(--change)}
+@media (prefers-reduced-motion:no-preference){.split span{transition:width .3s}}
+.tile{background:var(--panel);border:1px solid var(--line);border-top:4px solid var(--c,var(--ink));border-radius:6px;padding:12px 14px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.tile .big{font-family:var(--mono);font-size:1.7rem;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1}
+.tile .sub{font-size:.82rem;color:var(--muted)}
+.tile.travel{--c:var(--travel)} .tile.oncall{--c:var(--oncall)} .tile.change{--c:var(--change)}
+@media (max-width:520px){.tile .big{font-size:1.3rem}.tile{padding:10px}}
+
+/* Form */
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px}
+form{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:14px}
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.span2{grid-column:span 2}.span3{grid-column:span 3}.span6{grid-column:span 6}
+@media (max-width:820px){form{grid-template-columns:repeat(2,minmax(0,1fr))}.span2,.span3{grid-column:span 1}.span6,.wide-m{grid-column:span 2}}
+@media (max-width:460px){form{grid-template-columns:1fr}.span2,.span3,.span6,.wide-m{grid-column:span 1}}
+label.label{display:block}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:8px 10px;width:100%;min-width:0}
+textarea{min-height:64px;resize:vertical}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.cats{display:flex;flex-wrap:wrap;gap:8px}
+.cats label{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:6px;padding:8px 12px;cursor:pointer;background:var(--bg);font-weight:500}
+.cats input{width:auto;accent-color:var(--accent)}
+.cats label:has(input:checked){border-color:var(--c);background:var(--cs);box-shadow:inset 3px 0 0 var(--c)}
+.cats .travel{--c:var(--travel);--cs:var(--travel-soft)} .cats .oncall{--c:var(--oncall);--cs:var(--oncall-soft)} .cats .change{--c:var(--change);--cs:var(--change-soft)}
+.shifts{display:flex;flex-wrap:wrap;gap:8px}
+.shifts label{position:relative;display:flex;align-items:center;justify-content:center;min-width:56px;height:44px;border:1px solid var(--line);border-radius:6px;background:var(--bg);font-family:var(--display);font-weight:700;font-size:1.3rem;cursor:pointer}
+.shifts input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.shifts label:has(input:checked){background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.shifts label:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+.shiftcell{white-space:nowrap}
+.rb{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:.82rem;padding:3px 9px;border-radius:4px;color:var(--r-ink);background:var(--rc);box-shadow:inset 0 0 0 1px var(--r-edge);white-space:nowrap}
+.rb b{font-family:var(--display);font-size:1.05rem}
+.rb.off{background:var(--line);color:var(--ink);box-shadow:none}
+.k-black{--rc:var(--r-black)}.k-green{--rc:var(--r-green)}.k-red{--rc:var(--r-red)}.k-blue{--rc:var(--r-blue)}
+.daterow{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.datebtn{display:inline-flex;align-items:center;gap:10px;font:inherit;font-weight:600;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:9px 14px;cursor:pointer;min-height:44px}
+.datebtn .sw{width:16px;height:16px;border-radius:3px;background:var(--rc,var(--line));box-shadow:inset 0 0 0 1px var(--r-edge)}
+.roster{font-size:.9rem;color:var(--muted);min-width:0}
+.roster.warn{color:var(--danger)}
+.cal{margin-top:10px;border:1px solid var(--line);border-radius:8px;padding:12px;background:var(--bg);max-width:460px}
+.calhead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.calhead strong{font-family:var(--display);font-size:1.2rem;text-transform:uppercase;letter-spacing:.04em}
+.calhead div{display:flex;gap:6px}
+.calnav{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:5px;padding:4px 10px;cursor:pointer;min-height:34px}
+.calgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.calgrid .wd{font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);text-align:center;font-weight:600;padding-bottom:2px}
+.day{position:relative;font:inherit;border:0;border-radius:5px;background:var(--rc);color:var(--r-ink);box-shadow:inset 0 0 0 1px var(--r-edge);min-height:48px;padding:4px 2px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+.day .n{font-family:var(--mono);font-weight:600;font-size:.95rem;line-height:1}
+.day .t{font-size:.62rem;letter-spacing:.04em;opacity:.92;line-height:1.1}
+.day.other{opacity:.45}
+.day.dim .t{opacity:.55}
+.day.today{box-shadow:inset 0 0 0 2px var(--accent)}
+.day.sel{outline:3px solid var(--accent);outline-offset:1px;z-index:1}
+.legend{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px;margin-top:10px;font-size:.8rem;color:var(--muted)}
+.legend span{display:flex;align-items:center;gap:6px}
+.legend i{width:12px;height:12px;border-radius:2px;background:var(--rc);box-shadow:inset 0 0 0 1px var(--r-edge);flex:0 0 auto}
+.mail{display:flex;flex-direction:column;gap:12px}
+.mailgrid{display:flex;flex-direction:column;gap:12px}
+#mail-body{font-family:var(--mono);font-size:.82rem;min-height:200px}
+a.btn{text-decoration:none;display:inline-flex;align-items:center}
+.pair{display:flex;gap:6px}.pair input{flex:1 1 0}
+.duration{font-family:var(--mono);font-size:1.15rem;padding:8px 0;font-variant-numeric:tabular-nums}
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.btn{font:inherit;font-weight:600;border-radius:6px;padding:9px 16px;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.msg{font-size:.88rem;color:var(--muted)} .msg.err{color:var(--danger)}
+
+/* Log */
+.loghead{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.filters{display:flex;flex-wrap:wrap;gap:8px}
+.filters select{width:auto}
+.tablewrap{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px}
+table{width:100%;border-collapse:collapse;min-width:780px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:600;background:var(--panel);position:sticky;top:0}
+tr:last-child td{border-bottom:0}
+td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.chip{display:inline-block;font-size:.78rem;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;color:var(--c);background:var(--cs)}
+.chip.out{--c:var(--repair);--cs:var(--repair-soft)} .chip.travel{--c:var(--travel);--cs:var(--travel-soft)} .chip.oncall{--c:var(--oncall);--cs:var(--oncall-soft)} .chip.change{--c:var(--change);--cs:var(--change-soft)}
+.notes{color:var(--muted);font-size:.9rem;min-width:280px;max-width:440px}
+.notes .clip{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer}
+.notes .clip.open{display:block;-webkit-line-clamp:unset;overflow:visible}
+.notes .clip:not(.open)::after{content:""}
+.rowbtns{display:flex;gap:6px;white-space:nowrap}
+.link{font:inherit;font-size:.85rem;background:none;border:0;color:var(--travel);cursor:pointer;padding:2px 4px;text-decoration:underline}
+.link.del{color:var(--danger)}
+.empty{padding:36px 20px;text-align:center;color:var(--muted)}
+.empty strong{display:block;color:var(--ink);font-size:1.05rem;margin-bottom:4px}
+.foot{font-size:.82rem;color:var(--muted)}
+.share{display:flex;flex-wrap:wrap;gap:20px;align-items:center}
+.qr{background:#ffffff;padding:12px;border-radius:6px;border:1px solid var(--line);line-height:0;flex:0 0 auto}
+.qr img,.qr canvas{width:200px;height:200px;display:block}
+.sharetext{flex:1 1 280px;min-width:0;display:flex;flex-direction:column;gap:10px}
+.sharetext p{margin:0;max-width:60ch}
+.linkrow{display:flex;gap:8px;flex-wrap:wrap}
+.linkrow input{flex:1 1 220px;font-family:var(--mono);font-size:.85rem}
+@media (prefers-reduced-motion:no-preference){.btn,.seg button{transition:background .15s,color .15s}}
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header class="unit">
+    <div>
+      <h1><span class="plate">502 L</span>502 Lima Data Collection</h1>
+      <p>Record every period the appliance is out of service: workshops, time with the on-call mechanic and vehicle changeovers.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px"><button class="btn" type="button" id="share-btn" aria-expanded="false" aria-controls="share">Share via QR code</button><div class="status" id="status" role="status">Connecting to shared log…</div></div>
+  </header>
+
+  <section class="panel share" id="share" hidden aria-labelledby="share-h">
+    <div id="qr" class="qr" aria-label="QR code linking to this log"></div>
+    <div class="sharetext">
+      <h2 id="share-h">Scan to open the log</h2>
+      <p>Point a phone camera at the code to open 502 Lima Data Collection. Print it and keep it in the cab so crews can log time on the spot.</p>
+      <div class="linkrow"><input type="text" id="share-url" readonly aria-label="Link to this log"><button class="btn" type="button" id="copy">Copy link</button></div>
+      <div class="actions"><button class="btn primary" type="button" id="qr-dl" hidden>Download QR code</button><span class="msg" id="share-msg" role="status"></span></div>
+      <p class="foot"><strong>Use it like an app:</strong> after scanning, add it to your phone's home screen. iPhone (Safari): tap Share, then Add to Home Screen. Android (Chrome): tap ⋮, then Add to Home screen.</p>
+      <p class="foot">Anyone with the link or QR code can open the log and add entries. No sign-in is needed.</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="totals-h" style="display:flex;flex-direction:column;gap:12px">
+    <div class="toolbar">
+      <h2 id="totals-h">Time out of service</h2>
+      <div class="seg" role="group" aria-label="Period">
+        <button type="button" data-period="month" aria-pressed="true">This month</button>
+        <button type="button" data-period="30">Last 30 days</button>
+        <button type="button" data-period="year">This year</button>
+        <button type="button" data-period="all">All time</button>
+      </div>
+    </div>
+    <div class="totals">
+      <div class="tile all"><span class="label">Total time out of service</span><span class="big" id="t-all">0:00</span><span class="sub">Workshops + on-call mechanic + vehicle changeover · <span id="t-all-n">0 entries</span></span>
+        <div class="split" aria-hidden="true"><span class="travel" id="b-travel"></span><span class="oncall" id="b-oncall"></span><span class="change" id="b-change"></span></div></div>
+      <div class="tile travel"><span class="label">Workshops</span><span class="big" id="t-travel">0:00</span><span class="sub" id="t-travel-n">0 entries</span></div>
+      <div class="tile oncall"><span class="label">On-call mechanic</span><span class="big" id="t-oncall">0:00</span><span class="sub" id="t-oncall-n">0 entries</span></div>
+      <div class="tile change"><span class="label">Vehicle changeover</span><span class="big" id="t-change">0:00</span><span class="sub" id="t-change-n">0 entries</span></div>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="form-h">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <h2 id="form-h">New entry</h2>
+      <span class="foot" id="edit-note" hidden>Editing an existing entry</span>
+    </div>
+    <form id="entry" novalidate>
+      <fieldset class="field span6" style="border:0;padding:0;margin:0">
+        <legend class="label" style="margin-bottom:6px">Shift</legend>
+        <div class="shifts">
+          <label><input type="radio" name="shift" id="s-A" value="A"> A</label>
+          <label><input type="radio" name="shift" id="s-B" value="B"> B</label>
+          <label><input type="radio" name="shift" id="s-C" value="C"> C</label>
+          <label><input type="radio" name="shift" id="s-D" value="D"> D</label>
+        </div>
+      </fieldset>
+      <div class="field span6">
+        <span class="label">Date</span>
+        <div class="daterow">
+          <button type="button" class="datebtn" id="date-btn" aria-expanded="false" aria-controls="cal"><span class="sw" id="date-sw"></span><span id="date-txt">Pick a date</span></button>
+          <div class="roster" id="roster" role="status">Pick a shift and a date to see whether it's a day or night shift.</div>
+        </div>
+        <div class="cal" id="cal" hidden></div>
+      </div>
+      <fieldset class="field span6" style="border:0;padding:0;margin:0">
+        <legend class="label" style="margin-bottom:6px">Reason out of service</legend>
+        <div class="cats">
+          <label class="travel"><input type="radio" name="category" id="c-travel" value="travel" checked> Workshops</label>
+          <label class="oncall"><input type="radio" name="category" id="c-oncall" value="oncall"> With on-call mechanic</label>
+          <label class="change"><input type="radio" name="category" id="c-change" value="change"> Vehicle changeover</label>
+        </div>
+      </fieldset>
+      <div class="field span2"><label class="label" for="stime">Offline from (24 hr)</label><input type="time" id="stime" step="60"></div>
+      <div class="field span2"><label class="label" for="etime">Back in service</label><div class="pair"><input type="date" id="edate" aria-label="Back in service date"><input type="time" id="etime" step="60" aria-label="Back in service time"></div></div>
+      <div class="field span2"><span class="label">Duration</span><span class="duration" id="dur">–</span></div>
+      <div class="field span6" id="relief-wrap" hidden><label class="label" for="relief">Changeover vehicle</label><input type="text" id="relief" placeholder="Relief / spare vehicle taken over, e.g. 5xx Spare" autocomplete="off"></div>
+      <div class="field span6"><label class="label" for="who">Your name</label><input type="text" id="who" placeholder="e.g. J. Smith (remembered on this phone)" autocomplete="name"></div>
+      <div class="field span6"><label class="label" for="notes">Comments</label><textarea id="notes" placeholder="Comments: what happened, where it went, who it was with…"></textarea></div>
+      <div class="actions span6">
+        <button class="btn primary" type="submit" id="save">Save entry</button>
+        <button class="btn" type="button" id="cancel" hidden>Cancel edit</button>
+        <span class="msg" id="msg" role="status"></span>
+      </div>
+    </form>
+  </section>
+
+  <section aria-labelledby="log-h" style="display:flex;flex-direction:column;gap:12px">
+    <div class="loghead">
+      <h2 id="log-h">Log</h2>
+      <div class="filters">
+        <label class="label" for="f-cat" style="align-self:center">Show</label>
+        <select id="f-cat">
+          <option value="all">All reasons</option>
+          <option value="travel">Workshops</option>
+          <option value="oncall">On-call mechanic</option>
+          <option value="change">Vehicle changeover</option>
+        </select>
+        <select id="f-shift" aria-label="Filter by shift">
+          <option value="all">All shifts</option>
+          <option value="A">A shift</option><option value="B">B shift</option><option value="C">C shift</option><option value="D">D shift</option>
+        </select>
+        <select id="f-dn" aria-label="Filter by day or night">
+          <option value="all">Days &amp; nights</option><option value="day">Day shifts</option><option value="night">Night shifts</option>
+        </select>
+        <button class="btn" type="button" id="csv" hidden>Download CSV</button>
+        <button class="btn" type="button" id="mail-btn" aria-expanded="false" aria-controls="mail">Email report</button>
+      </div>
+    </div>
+    <div class="panel mail" id="mail" hidden>
+      <h2>Email report</h2>
+      <p class="foot" id="mail-scope"></p>
+      <div class="mailgrid">
+        <div class="field"><label class="label" for="mail-to">Send to</label><input type="email" id="mail-to" placeholder="name@qfes.qld.gov.au (separate several with commas)" autocomplete="email"></div>
+        <div class="field"><label class="label" for="mail-subj">Subject</label><input type="text" id="mail-subj"></div>
+        <div class="field"><label class="label" for="mail-body">Message</label><textarea id="mail-body" rows="10"></textarea></div>
+      </div>
+      <div class="actions">
+        <a class="btn primary" id="mail-a" href="mailto:" target="_blank" rel="noopener">Open in email app</a>
+        <button class="btn" type="button" id="mail-copy">Copy email text</button>
+        <span class="msg" id="mail-msg" role="status"></span>
+      </div>
+      <p class="foot">If your email app doesn't open, copy the text and paste it into a new email. To send the full spreadsheet, use Download CSV and attach the file.</p>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Shift</th><th>Reason</th><th>Offline from</th><th>Back in service</th><th>Duration</th><th>Comments</th><th>Logged by</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="empty" id="empty"><strong>No downtime logged yet</strong>Fill in the form above each time 502 Lima goes off the run. Entries appear here for everyone with the link.</div>
+    </div>
+    <p class="foot">Shift roster: 2 days (07:00–17:00), 2 nights (17:00–07:00), 4 off, counted from C shift's first day on 3 Nov 2026. Times are local. Leave “Back in service” blank while the appliance is still out; the entry shows as open until someone fills it in.</p>
+  </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+(function(){
+  const CAT = {travel:"Workshops", oncall:"On-call mechanic", change:"Vehicle changeover"};
+  const $ = id => document.getElementById(id);
+  let entries=[], period="month", editingId=null, pendingDelete=null, canWrite=true;
+
+  // Roster: 8-day cycle of 2-day blocks. Each block = one crew on days, one on nights, one colour.
+  const pad2=n=>String(n).padStart(2,"0");
+  const dnOf=(y,m,d)=>Math.floor(Date.UTC(y,m-1,d)/864e5);
+  const dnStr=str=>{ const [y,m,d]=str.split("-").map(Number); return dnOf(y,m,d); };
+  const strDn=dn=>{ const d=new Date(dn*864e5); return d.getUTCFullYear()+"-"+pad2(d.getUTCMonth()+1)+"-"+pad2(d.getUTCDate()); };
+  const ANCHOR=dnOf(2026,11,3); // first of two C days
+  const BLOCKS=[{day:"C",night:"B",k:"red"},{day:"D",night:"C",k:"blue"},{day:"A",night:"D",k:"black"},{day:"B",night:"A",k:"green"}];
+  const DAYK={A:"black",B:"green",C:"red",D:"blue"}, NIGHTK={A:"green",B:"red",C:"blue",D:"black"};
+  const blockOf=dn=>BLOCKS[Math.floor((((dn-ANCHOR)%8)+8)%8/2)];
+  const statusOn=(sh,dn)=>{ const b=blockOf(dn); return b.day===sh?"day":b.night===sh?"night":"off"; };
+  const kOf=(sh,per)=>per==="day"?DAYK[sh]:per==="night"?NIGHTK[sh]:"";
+  const HOURS={day:"07:00–17:00",night:"17:00–07:00"};
+  function classify(sh,dateStr,timeStr){
+    if(!sh||!dateStr) return null;
+    const dn=dnStr(dateStr);
+    if(timeStr){ const [h,mi]=timeStr.split(":").map(Number); const t=h*60+mi;
+      let sdn=dn, type; if(t<420){sdn=dn-1;type="night";} else if(t<1020){type="day";} else {type="night";}
+      const b=blockOf(sdn), on=type==="day"?b.day:b.night;
+      if(on===sh) return {period:type,ok:true};
+      return {period:statusOn(sh,dn),ok:false,on,type};
+    }
+    const st=statusOn(sh,dn); return {period:st,ok:st!=="off"};
+  }
+  const longDate=str=>{ const [y,m,d]=str.split("-").map(Number); return new Date(y,m-1,d).toLocaleDateString("en-AU",{weekday:"short",day:"numeric",month:"short",year:"numeric"}); };
+
+  const parse = s => s ? new Date(s) : null;
+  const mins = e => { const a=parse(e.start), b=parse(e.end); return a&&b&&b>a ? Math.round((b-a)/60000) : 0; };
+  const hm = m => Math.floor(m/60)+":"+String(m%60).padStart(2,"0");
+  const fmt = s => { const d=parse(s); if(!d||isNaN(d)) return "—";
+    return d.toLocaleDateString("en-AU",{day:"2-digit",month:"short",year:"numeric"})+" "+d.toLocaleTimeString("en-AU",{hour:"2-digit",minute:"2-digit",hour12:false}); };
+  const esc = s => String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+  function inPeriod(e){
+    if(period==="all") return true;
+    const d=parse(e.start); if(!d) return false; const now=new Date();
+    if(period==="month") return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth();
+    if(period==="year") return d.getFullYear()===now.getFullYear();
+    return (now-d) <= 30*864e5;
+  }
+
+  let sdate="", calY, calM, edateTouched=false;
+  const curShift=()=>{ const r=document.querySelector('input[name="shift"]:checked'); return r?r.value:""; };
+  const startVal=()=> sdate && $("stime").value ? sdate+"T"+$("stime").value : "";
+  const endVal=()=> $("edate").value && $("etime").value ? $("edate").value+"T"+$("etime").value : "";
+  function autoEnd(){
+    if(edateTouched || !sdate) return;
+    let d=sdate; const st=$("stime").value, et=$("etime").value;
+    if(st && et && et<=st) d=strDn(dnStr(sdate)+1);
+    $("edate").value=d;
+  }
+  function updateDur(){
+    autoEnd();
+    const sv=startVal(), ev=endVal(), m=mins({start:sv,end:ev});
+    $("dur").textContent = !ev ? "Still out" : (!sv ? "–" : (m ? hm(m)+" h" : "Check times"));
+  }
+  function updateRoster(){
+    const sh=curShift(), r=$("roster"), c=classify(sh,sdate,$("stime").value);
+    $("date-txt").textContent = sdate ? longDate(sdate) : "Pick a date";
+    const b = sdate ? blockOf(dnStr(sdate)) : null;
+    $("date-sw").className = "sw" + (b ? " k-"+b.k : "");
+    r.classList.remove("warn");
+    if(!sdate || !sh){ r.textContent = sdate ? `On duty: ${b.day} shift days, ${b.night} shift nights. Pick the shift.` : "Pick a shift and a date to see whether it's a day or night shift."; return; }
+    if(c.ok){ r.innerHTML = `<span class="rb k-${kOf(sh,c.period)}"><b>${sh}</b> ${c.period==="day"?"Day":"Night"} shift · ${HOURS[c.period]}</span>`; return; }
+    r.classList.add("warn");
+    if(c.on) r.textContent = `${sh} shift isn't on at ${$("stime").value}. ${c.on} shift is on ${c.type==="day"?"days":"nights"} then. Check the shift or time.`;
+    else r.textContent = `${sh} shift is rostered off on this date. On duty: ${b.day} days, ${b.night} nights.`;
+  }
+  function drawCal(){
+    const sh=curShift(), first=new Date(calY,calM,1), lead=(first.getDay()+6)%7;
+    const startDn=dnOf(calY,calM+1,1)-lead, now=new Date(), todayDn=dnOf(now.getFullYear(),now.getMonth()+1,now.getDate());
+    const selDn = sdate ? dnStr(sdate) : null;
+    let h=`<div class="calhead"><strong>${first.toLocaleDateString("en-AU",{month:"long",year:"numeric"})}</strong><div><button type="button" class="calnav" data-nav="-1" aria-label="Previous month">‹</button><button type="button" class="calnav" data-nav="0">Today</button><button type="button" class="calnav" data-nav="1" aria-label="Next month">›</button></div></div><div class="calgrid">`;
+    h+=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(w=>`<span class="wd">${w}</span>`).join("");
+    for(let i=0;i<42;i++){
+      const dn=startDn+i, str=strDn(dn), b=blockOf(dn), inM=Number(str.slice(5,7))===calM+1;
+      if(i>=35 && !inM && i%7===0) break;
+      let t, dim=false;
+      if(sh){ const st=statusOn(sh,dn); t= st==="day"?sh+" DAY":st==="night"?sh+" NIGHT":"off"; dim=st==="off"; }
+      else t=`${b.day} D · ${b.night} N`;
+      h+=`<button type="button" class="day k-${b.k}${inM?"":" other"}${dim?" dim":""}${dn===todayDn?" today":""}${dn===selDn?" sel":""}" data-date="${str}" aria-label="${longDate(str)}: ${b.day} shift days, ${b.night} shift nights" aria-pressed="${dn===selDn}"><span class="n">${Number(str.slice(8))}</span><span class="t">${t}</span></button>`;
+    }
+    h+=`</div><div class="legend">${BLOCKS.slice().sort((x,y)=>"black green red blue".indexOf(x.k)-"black green red blue".indexOf(y.k)).map(b=>`<span><i class="k-${b.k}"></i>${b.k[0].toUpperCase()+b.k.slice(1)}: ${b.day} days · ${b.night} nights</span>`).join("")}</div>`;
+    $("cal").innerHTML=h;
+  }
+  function openCal(open){ $("cal").hidden=!open; $("date-btn").setAttribute("aria-expanded",String(open)); if(open){ const base=sdate?sdate:null; const d=base?new Date(base+"T12:00"):new Date(); calY=d.getFullYear(); calM=d.getMonth(); drawCal(); } }
+  $("date-btn").addEventListener("click",()=>openCal($("cal").hidden));
+  $("cal").addEventListener("click",ev=>{
+    const nav=ev.target.closest("[data-nav]"), day=ev.target.closest("[data-date]");
+    if(nav){ const n=Number(nav.dataset.nav); if(n===0){ const d=new Date(); calY=d.getFullYear(); calM=d.getMonth(); } else { calM+=n; if(calM<0){calM=11;calY--;} if(calM>11){calM=0;calY++;} } drawCal(); }
+    if(day){ setDate(day.dataset.date); openCal(false); $("stime").focus(); }
+  });
+  function setDate(str){ sdate=str; updateRoster(); updateDur(); }
+  document.querySelectorAll('input[name="shift"]').forEach(r=>r.addEventListener("change",()=>{ updateRoster(); if(!$("cal").hidden) drawCal(); }));
+  $("stime").addEventListener("input",()=>{ updateRoster(); updateDur(); });
+  $("etime").addEventListener("input",updateDur);
+  $("edate").addEventListener("input",()=>{ edateTouched=!!$("edate").value; updateDur(); });
+  function syncRelief(){ $("relief-wrap").hidden = document.querySelector('input[name="category"]:checked').value!=="change"; }
+  document.querySelectorAll('input[name="category"]').forEach(r=>r.addEventListener("change",syncRelief));
+
+  async function render(){
+    const list = entries.filter(inPeriod);
+    const sum = c => list.filter(e=>!c||e.category===c);
+    const setTile=(id,arr)=>{ $(id).textContent=hm(arr.reduce((a,e)=>a+mins(e),0)); $(id+"-n").textContent=arr.length+(arr.length===1?" entry":" entries"); };
+    setTile("t-all",sum()); setTile("t-travel",sum("travel")); setTile("t-oncall",sum("oncall")); setTile("t-change",sum("change"));
+    const tot=sum().reduce((a,e)=>a+mins(e),0);
+    ["travel","oncall","change"].forEach(c=>{ const m=sum(c).reduce((a,e)=>a+mins(e),0); $("b-"+c).style.width=(tot?m/tot*100:0)+"%"; });
+
+    const fc=$("f-cat").value;
+    const fs=$("f-shift").value, fd=$("f-dn").value;
+    const shown = entries.filter(e=>(fc==="all"||e.category===fc)&&(fs==="all"||e.shift===fs)&&(fd==="all"||e.period===fd)).sort((a,b)=>String(b.start).localeCompare(String(a.start)));
+    $("empty").hidden = shown.length>0;
+    if(entries.length && !shown.length){ $("empty").innerHTML="<strong>No entries match</strong>Choose “All reasons”, “All shifts” and “Days &amp; nights” to see the full log."; }
+    $("rows").innerHTML = shown.map(e=>{
+      const m=mins(e); const open=!e.end;
+      const who = e.by || "—";
+      const del = pendingDelete===e.id;
+      return `<tr>
+        <td class="shiftcell">${e.shift?(e.period==="day"||e.period==="night"?`<span class="rb k-${kOf(e.shift,e.period)}"><b>${esc(e.shift)}</b> ${e.period==="day"?"Day":"Night"}</span>`:`<span class="rb off"><b>${esc(e.shift)}</b> Off roster</span>`):"—"}</td>
+        <td><span class="chip ${esc(e.category)}">${esc(CAT[e.category]||e.category)}</span></td>
+        <td class="num">${fmt(e.start)}</td>
+        <td class="num">${open?'<span class="chip out">Still out</span>':fmt(e.end)}</td>
+        <td class="num">${open?"—":hm(m)}</td>
+        <td class="notes">${e.relief?`<strong>Changeover vehicle:</strong> ${esc(e.relief)}<br>`:""}<div class="clip" title="Tap to show or hide the full comment">${esc(e.notes)}</div></td>
+        <td>${esc(who)}</td>
+        <td>${canWrite?`<div class="rowbtns"><button class="link" data-edit="${esc(e.id)}">Edit</button><button class="link del" data-del="${esc(e.id)}">${del?"Confirm delete":"Delete"}</button></div>`:""}</td>
+      </tr>`; }).join("");
+  }
+
+  document.querySelectorAll(".seg button").forEach(b=>b.addEventListener("click",()=>{
+    period=b.dataset.period; document.querySelectorAll(".seg button").forEach(x=>x.setAttribute("aria-pressed",String(x===b))); render(); if(!$("mail").hidden) fillMail(); }));
+  $("f-cat").addEventListener("change",render); $("f-shift").addEventListener("change",render); $("f-dn").addEventListener("change",render);
+
+  $("rows").addEventListener("click",async ev=>{
+    const clip=ev.target.closest(".clip"); if(clip){ clip.classList.toggle("open"); return; }
+    const ed=ev.target.closest("[data-edit]"), dl=ev.target.closest("[data-del]");
+    if(ed){ const e=entries.find(x=>x.id===ed.dataset.edit); if(!e) return;
+      editingId=e.id; $("c-"+e.category).checked=true; document.querySelectorAll('input[name="shift"]').forEach(r=>r.checked=r.value===e.shift); const [sd,st]=(e.start||"T").split("T"), [ed,et]=(e.end||"T").split("T");
+      sdate=sd||""; $("stime").value=st||""; $("edate").value=ed||""; $("etime").value=et||""; edateTouched=!!ed; updateRoster();
+      $("notes").value=e.notes||""; $("relief").value=e.relief||""; syncRelief();
+      $("form-h").textContent="Edit entry"; $("save").textContent="Save changes"; $("cancel").hidden=false; updateDur();
+      $("entry").scrollIntoView({behavior:"smooth",block:"start"}); }
+    if(dl){ const id=dl.dataset.del;
+      if(pendingDelete!==id){ pendingDelete=id; render(); return; }
+      pendingDelete=null;
+      try{ await run("deleteEntry",id); entries=entries.filter(x=>x.id!==id); render(); flash("Entry deleted."); refresh(); }catch(e){ flash("Couldn't delete that entry. Try again.",true); } }
+  });
+
+  function resetForm(){
+    editingId=null; $("entry").reset(); try{ $("who").value=localStorage.getItem("502l-who")||""; }catch(_){} sdate=""; edateTouched=false; openCal(false); updateRoster(); $("c-travel").checked=true; syncRelief(); $("form-h").textContent="New entry"; $("save").textContent="Save entry"; $("cancel").hidden=true; updateDur();
+  }
+  $("cancel").addEventListener("click",resetForm);
+  function flash(t,err){ $("msg").textContent=t; $("msg").className="msg"+(err?" err":""); }
+
+  $("entry").addEventListener("submit",async ev=>{
+    ev.preventDefault();
+    const category=document.querySelector('input[name="category"]:checked').value;
+    const shiftEl=document.querySelector('input[name="shift"]:checked');
+    if(!shiftEl){ flash("Select the shift: A, B, C or D.",true); $("s-A").focus(); return; }
+    if(!sdate){ flash("Pick the date 502 Lima went out of service.",true); $("date-btn").focus(); return; }
+    if(!$("stime").value){ flash("Enter the time 502 Lima went out of service.",true); $("stime").focus(); return; }
+    if($("etime").value && !$("edate").value){ flash("Enter the date it was back in service.",true); $("edate").focus(); return; }
+    const start=startVal(), end=endVal();
+    if(end && new Date(end)<=new Date(start)){ flash("“Back in service” must be after “Offline from”.",true); $("etime").focus(); return; }
+    const cls=classify(shiftEl.value,sdate,$("stime").value);
+    const body={category,shift:shiftEl.value,period:cls?cls.period:"",start,end:end||"",notes:$("notes").value.trim(),relief:category==="change"?$("relief").value.trim():""};
+    $("save").disabled=true;
+    try{
+      const who=$("who").value.trim(); try{ localStorage.setItem("502l-who",who); }catch(_){}
+      if(editingId){ await run("updateEntry",editingId,body); flash("Changes saved."); }
+      else{ await run("addEntry",{...body,by:who}); flash("Entry saved."); }
+      await refresh();
+      resetForm();
+    }catch(e){
+      flash("Couldn't save. Check your connection and try again.",true);
+    }finally{ $("save").disabled=false; }
+  });
+
+  $("csv").addEventListener("click",async ()=>{
+    const head=["Shift","Day/Night","Reason","Offline from","Back in service","Duration (h)","Changeover vehicle","Comments"];
+    const q=v=>'"'+String(v??"").replace(/"/g,'""')+'"';
+    const rows=[...entries].sort((a,b)=>String(a.start).localeCompare(String(b.start))).map(e=>[e.shift||"",e.period==="day"?"Day":e.period==="night"?"Night":e.period==="off"?"Off roster":"",CAT[e.category]||e.category,e.start,e.end||"Still out",e.end?(mins(e)/60).toFixed(2):"",e.relief||"",e.notes].map(q).join(","));
+    saveFile("502-lima-data-collection.csv",new Blob([[head.map(q).join(","),...rows].join("\n")],{type:"text/csv"}));
+  });
+
+  const PLABEL={month:"this month","30":"the last 30 days",year:"this year",all:"all time"};
+  const PERIOD_TITLE={month:()=>new Date().toLocaleDateString("en-AU",{month:"long",year:"numeric"}),"30":()=>"last 30 days",year:()=>String(new Date().getFullYear()),all:()=>"all entries"};
+  const dnLabel=e=>e.period==="day"?"Day":e.period==="night"?"Night":e.period==="off"?"Off roster":"";
+  function buildMail(){
+    const list=entries.filter(inPeriod).sort((a,b)=>String(a.start).localeCompare(String(b.start)));
+    const tot=c=>list.filter(e=>!c||e.category===c).reduce((a,e)=>a+mins(e),0);
+    const cnt=c=>list.filter(e=>!c||e.category===c).length;
+    let head=`502 Lima Data Collection – ${PERIOD_TITLE[period]()}\n\n`+
+      `Total time out of service: ${hm(tot())} h (${cnt()} entries)\n`+
+      `  Workshops: ${hm(tot("travel"))} h (${cnt("travel")})\n`+
+      `  On-call mechanic: ${hm(tot("oncall"))} h (${cnt("oncall")})\n`+
+      `  Vehicle changeover: ${hm(tot("change"))} h (${cnt("change")})\n\n`;
+    const lines=list.map(e=>`${fmt(e.start)} → ${e.end?fmt(e.end):"still out"} | ${e.shift||"?"} ${dnLabel(e)} | ${CAT[e.category]||e.category} | ${e.end?hm(mins(e))+" h":"open"}`+(e.relief?` | Changeover vehicle: ${e.relief}`:"")+(e.notes?`\n    ${e.notes.replace(/\s+/g," ")}`:""));
+    const tail=`\n\nLive log: ${SHARE_URL}`;
+    return {head, lines, tail, n:list.length};
+  }
+  let mailEdited=false;
+  function fillMail(){
+    const m=buildMail();
+    $("mail-scope").textContent=`Summary and entries for ${PLABEL[period]} (change the period at the top of the page).`;
+    if(!$("mail-subj").dataset.touched) $("mail-subj").value=`502 Lima Data Collection – ${PERIOD_TITLE[period]()}`;
+    if(!mailEdited) $("mail-body").value=m.head+(m.lines.length?"Entries:\n"+m.lines.join("\n"):"No entries logged for this period.")+m.tail;
+    updateMailLink();
+  }
+  function updateMailLink(){
+    const LIMIT=1900; let body=$("mail-body").value;
+    const enc=t=>encodeURIComponent(t);
+    const base="mailto:"+$("mail-to").value.split(",").map(x=>x.trim()).filter(Boolean).map(enc).join(",")+"?subject="+enc($("mail-subj").value)+"&body=";
+    if((base+enc(body)).length>LIMIT && !mailEdited){
+      const m=buildMail(); let kept=[];
+      for(const l of m.lines){ const tryB=m.head+"Entries:\n"+[...kept,l].join("\n")+`\n…plus more entries in the live log.`+m.tail; if((base+enc(tryB)).length>LIMIT) break; kept.push(l); }
+      body=m.head+(kept.length?"Entries:\n"+kept.join("\n")+"\n":"")+`…${m.lines.length-kept.length} more entries in the live log.`+m.tail;
+      $("mail-msg").textContent="The email app link carries the summary and the latest entries that fit. Copy email text includes everything.";
+    } else if((base+enc(body)).length>LIMIT){ body=body.slice(0,1200)+"\n…"; $("mail-msg").textContent="Message is long, so the email app link is shortened. Copy email text includes everything."; }
+    else $("mail-msg").textContent="";
+    $("mail-a").href=base+enc(body);
+  }
+  $("mail-btn").addEventListener("click",()=>{ const open=$("mail").hidden; $("mail").hidden=!open; $("mail-btn").setAttribute("aria-expanded",String(open)); if(open){ mailEdited=false; fillMail(); $("mail-to").focus(); } });
+  $("mail-to").addEventListener("input",updateMailLink);
+  $("mail-subj").addEventListener("input",()=>{ $("mail-subj").dataset.touched="1"; updateMailLink(); });
+  $("mail-body").addEventListener("input",()=>{ mailEdited=true; updateMailLink(); });
+  $("mail-copy").addEventListener("click",()=>{
+    const text=($("mail-to").value?"To: "+$("mail-to").value+"\n":"")+"Subject: "+$("mail-subj").value+"\n\n"+$("mail-body").value;
+    const sel=()=>{ $("mail-body").select(); $("mail-msg").textContent="Press Ctrl+C or Cmd+C to copy the message."; };
+    try{ navigator.clipboard.writeText(text).then(()=>{ $("mail-msg").textContent="Email text copied. Paste it into a new email."; },sel); }catch(_){ sel(); }
+  });
+
+  const SHARE_URL=location.protocol==="https:" ? location.origin+location.pathname.replace(/index\.html$/,"") : "https://script.google.com/macros/s/AKfycbwAvIOE56lfcA6d3tk9T0m-czmwxCxlYzgoXWkpe31YoOD4l15sjnV4KWpvaStk0Tko/exec";
+  $("share-url").value=SHARE_URL;
+  let qrMade=false;
+  $("share-btn").addEventListener("click",()=>{
+    const open=$("share").hidden; $("share").hidden=!open; $("share-btn").setAttribute("aria-expanded",String(open));
+    if(open && !qrMade){ qrMade=true;
+      try{ new QRCode($("qr"),{text:SHARE_URL,width:400,height:400,colorDark:"#000000",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.M}); }
+      catch(_){ $("qr").textContent="QR code couldn't load. Use the link instead."; } }
+  });
+  $("copy").addEventListener("click",()=>{
+    const done=()=>{ $("share-msg").textContent="Link copied."; };
+    try{ navigator.clipboard.writeText(SHARE_URL).then(done,()=>{ $("share-url").select(); $("share-msg").textContent="Press Ctrl+C or Cmd+C to copy."; }); }
+    catch(_){ $("share-url").select(); }
+  });
+  $("qr-dl").addEventListener("click",async ()=>{
+    const c=$("qr").querySelector("canvas"); if(!c) return;
+    const out=document.createElement("canvas"); const pad=40, sz=c.width;
+    out.width=sz+pad*2; out.height=sz+pad*2+70;
+    const g=out.getContext("2d"); g.fillStyle="#ffffff"; g.fillRect(0,0,out.width,out.height);
+    g.drawImage(c,pad,pad); g.fillStyle="#000000"; g.font="bold 30px Arial, sans-serif"; g.textAlign="center";
+    g.fillText("502 Lima Data Collection",out.width/2,sz+pad+48);
+    out.toBlob(b=>saveFile("502-lima-data-collection-qr.png",b),"image/png");
+  });
+
+  updateRoster(); updateDur();
+  render();
+
+  // Data lives in the 502 Lima Google Sheet, reached through its Apps Script API.
+  const API="https://script.google.com/macros/s/AKfycbwAvIOE56lfcA6d3tk9T0m-czmwxCxlYzgoXWkpe31YoOD4l15sjnV4KWpvaStk0Tko/exec";
+  async function call(body){
+    const r = body
+      ? await fetch(API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(body)})
+      : await fetch(API+"?api=list&t="+Date.now());
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const j=await r.json(); if(!j.ok) throw new Error(j.error||"Request failed"); return j;
+  }
+  async function run(fn,...a){
+    if(fn==="getEntries") return (await call(null)).entries;
+    if(fn==="addEntry") return (await call({action:"add",entry:a[0]})).id;
+    if(fn==="updateEntry") return call({action:"update",id:a[0],entry:a[1]});
+    if(fn==="deleteEntry") return call({action:"delete",id:a[0]});
+    throw new Error("Unknown action");
+  }
+  function saveFile(name,blob){
+    try{ const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},2000); }
+    catch(_){ flash("Download was blocked by the browser.",true); }
+  }
+  let loading=false, firstLoad=true;
+  async function refresh(){
+    if(loading) return; loading=true;
+    try{
+      const list=await run("getEntries");
+      entries=Array.isArray(list)?list:[];
+      $("status").textContent="Live · "+entries.length+(entries.length===1?" entry":" entries")+" · updated "+new Date().toLocaleTimeString("en-AU",{hour:"2-digit",minute:"2-digit",hour12:false});
+      render(); if(!$("mail").hidden) fillMail();
+    }catch(e){
+      $("status").textContent= firstLoad ? "Can't reach the log. Check your connection and reload." : "Couldn't refresh. Showing the last entries loaded."; }
+    finally{ loading=false; firstLoad=false; }
+  }
+  try{ $("who").value=localStorage.getItem("502l-who")||""; }catch(_){}
+  $("csv").hidden=false; $("qr-dl").hidden=false;
+  refresh();
+  setInterval(()=>{ if(document.visibilityState==="visible") refresh(); },30000);
+  document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") refresh(); });
+})();
+</script>
+</body>
+</html>
